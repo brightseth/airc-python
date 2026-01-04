@@ -6,9 +6,15 @@ Minimal client for AIRC protocol. Four operations, nothing else.
 
 import time
 from typing import Any, Dict, List, Optional
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 import json
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError
 
 from .identity import Identity
 
@@ -35,35 +41,45 @@ class Client:
         name: str,
         registry: str = DEFAULT_REGISTRY,
         sign_requests: bool = False,  # Safe Mode: signing optional
+        working_on: str = "Building something",
     ):
         self.name = name
         self.registry = registry.rstrip("/")
         self.sign_requests = sign_requests
+        self.working_on = working_on
         self.identity = Identity(name)
         self._registered = False
+        self._token = None
+        self._session_id = None
 
     def register(self) -> Dict[str, Any]:
         """
-        Register identity with the registry.
+        Register with the registry and get a session token.
 
-        POST /identity
+        POST /presence with action='register'
         """
         self.identity.ensure_keypair()
 
         payload = {
-            "name": self.name,
-            "publicKey": self.identity.public_key_base64,
+            "action": "register",
+            "username": self.name,
+            "workingOn": self.working_on,
         }
 
-        result = self._post("/api/identity", payload)
-        self._registered = True
+        result = self._post("/api/presence", payload, auth=False)
+
+        if result.get("success") and result.get("token"):
+            self._token = result["token"]
+            self._session_id = result.get("sessionId")
+            self._registered = True
+
         return result
 
     def heartbeat(self, status: str = "available") -> Dict[str, Any]:
         """
         Send presence heartbeat.
 
-        POST /presence
+        POST /presence with action='heartbeat'
         """
         payload = {
             "action": "heartbeat",
@@ -97,7 +113,7 @@ class Client:
         """
         Poll for new messages.
 
-        GET /messages?to={name}
+        GET /messages?user={name}
 
         Args:
             since: Unix timestamp to filter messages after
@@ -105,46 +121,74 @@ class Client:
         Returns:
             List of message objects
         """
-        url = f"{self.registry}/api/messages?to={self.name}"
+        url = f"{self.registry}/api/messages?user={self.name}"
         if since:
             url += f"&since={since}"
 
         result = self._get(url)
         return result.get("messages", [])
 
-    def _post(self, endpoint: str, payload: dict) -> Dict[str, Any]:
-        """Make a signed POST request."""
+    def who(self) -> List[Dict[str, Any]]:
+        """
+        Get list of online users.
+
+        GET /presence
+        """
+        result = self._get(f"{self.registry}/api/presence")
+        return result.get("users", [])
+
+    def _post(self, endpoint: str, payload: dict, auth: bool = True) -> Dict[str, Any]:
+        """Make a POST request, optionally with auth."""
         url = f"{self.registry}{endpoint}"
-        body = json.dumps(payload).encode("utf-8")
 
         headers = {
             "Content-Type": "application/json",
         }
+
+        # Add auth token if we have one and auth is required
+        if auth and self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
 
         if self.sign_requests:
             signature = self.identity.sign(payload)
             headers["X-AIRC-Signature"] = signature
             headers["X-AIRC-Identity"] = self.name
 
-        req = Request(url, data=body, headers=headers, method="POST")
-
-        try:
-            with urlopen(req, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except HTTPError as e:
-            error_body = e.read().decode("utf-8") if e.fp else ""
-            raise AIRCError(f"HTTP {e.code}: {error_body}") from e
+        if HAS_REQUESTS:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            if response.status_code >= 400:
+                raise AIRCError(f"HTTP {response.status_code}: {response.text}")
+            return response.json()
+        else:
+            body = json.dumps(payload).encode("utf-8")
+            req = Request(url, data=body, headers=headers, method="POST")
+            try:
+                with urlopen(req, timeout=30) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except HTTPError as e:
+                error_body = e.read().decode("utf-8") if e.fp else ""
+                raise AIRCError(f"HTTP {e.code}: {error_body}") from e
 
     def _get(self, url: str) -> Dict[str, Any]:
         """Make a GET request."""
-        req = Request(url, method="GET")
+        headers = {}
 
-        try:
-            with urlopen(req, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except HTTPError as e:
-            error_body = e.read().decode("utf-8") if e.fp else ""
-            raise AIRCError(f"HTTP {e.code}: {error_body}") from e
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+
+        if HAS_REQUESTS:
+            response = requests.get(url, headers=headers, timeout=30)
+            if response.status_code >= 400:
+                raise AIRCError(f"HTTP {response.status_code}: {response.text}")
+            return response.json()
+        else:
+            req = Request(url, method="GET", headers=headers)
+            try:
+                with urlopen(req, timeout=30) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except HTTPError as e:
+                error_body = e.read().decode("utf-8") if e.fp else ""
+                raise AIRCError(f"HTTP {e.code}: {error_body}") from e
 
 
 class AIRCError(Exception):
