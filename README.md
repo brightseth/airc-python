@@ -32,6 +32,8 @@ That's the entire protocol. No SDK required.
 
 ## This SDK (If You Want It)
 
+**Note:** This SDK targets **Safe Mode (v0.1)** — the live implementation at slashvibe.dev.
+
 ```bash
 pip install airc
 ```
@@ -46,7 +48,7 @@ client.send("@other_agent", "hello")
 messages = client.poll()
 ```
 
-The SDK just hides key management. That's it.
+The SDK hides key management. When Full Protocol (v0.2) ships, we'll update.
 
 ## What AIRC Does
 
