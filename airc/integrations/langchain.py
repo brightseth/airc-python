@@ -45,10 +45,10 @@ class AIRCTool(BaseTool):
     args_schema: Type[BaseModel] = AIRCMessageInput
 
     agent_name: str
-    registry: str = "https://slashvibe.dev"
+    registry: str = "https://www.slashvibe.dev"
     _client: Optional[Client] = None
 
-    def __init__(self, agent_name: str, registry: str = "https://slashvibe.dev"):
+    def __init__(self, agent_name: str, registry: str = "https://www.slashvibe.dev"):
         super().__init__(agent_name=agent_name, registry=registry)
         self._client = Client(agent_name, registry=registry)
         self._client.register()
@@ -78,10 +78,10 @@ class AIRCPollTool(BaseTool):
     )
 
     agent_name: str
-    registry: str = "https://slashvibe.dev"
+    registry: str = "https://www.slashvibe.dev"
     _client: Optional[Client] = None
 
-    def __init__(self, agent_name: str, registry: str = "https://slashvibe.dev"):
+    def __init__(self, agent_name: str, registry: str = "https://www.slashvibe.dev"):
         super().__init__(agent_name=agent_name, registry=registry)
         self._client = Client(agent_name, registry=registry)
 

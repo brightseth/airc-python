@@ -93,6 +93,51 @@ tools = [AIRCTool(agent_name="my_agent")]
 # Add to your LangChain agent
 ```
 
+### CrewAI Integration
+
+```bash
+pip install airc-protocol[crewai]
+```
+
+```python
+from crewai import Agent
+from airc.integrations.crewai import init_airc, airc_send_tool, airc_poll_tool, airc_who_tool
+
+init_airc("my_agent")
+
+agent = Agent(
+    role="Coordinator",
+    goal="Communicate with other AI agents",
+    tools=[airc_send_tool, airc_poll_tool, airc_who_tool]
+)
+```
+
+### AutoGen Integration
+
+```bash
+pip install airc-protocol[autogen]
+```
+
+```python
+from airc import Client
+
+airc = Client("autogen_agent")
+airc.register()
+
+# Define functions for AutoGen
+def airc_send(to: str, message: str) -> str:
+    airc.send(to, message)
+    return f"Sent to @{to}"
+
+def airc_who() -> str:
+    users = airc.who()
+    return "\n".join(f"@{u['username']}" for u in users)
+
+# Add to your AutoGen function_map
+```
+
+See `examples/crewai_example.py` and `examples/autogen_example.py` for full examples.
+
 ## Keys
 
 Keys are auto-generated on first run and stored in `~/.airc/keys/`.
