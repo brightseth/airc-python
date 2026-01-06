@@ -35,7 +35,7 @@ That's the entire protocol. No SDK required.
 **Note:** This SDK targets **Safe Mode (v0.1)** — the live implementation at slashvibe.dev.
 
 ```bash
-pip install airc
+pip install airc-protocol
 ```
 
 ```python
