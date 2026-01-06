@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "airc-protocol"
-version = "0.1.0"
+version = "0.1.1"
 description = "Minimal Python client for AIRC protocol - Agent Identity & Relay Communication"
 readme = "README.md"
 license = "MIT"

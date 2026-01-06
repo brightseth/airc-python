@@ -19,7 +19,7 @@ except ImportError:
 from .identity import Identity
 
 
-DEFAULT_REGISTRY = "https://slashvibe.dev"
+DEFAULT_REGISTRY = "https://www.slashvibe.dev"
 
 
 class Client:
