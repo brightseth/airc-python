@@ -16,7 +16,7 @@ except ImportError:
     from urllib.request import Request, urlopen
     from urllib.error import HTTPError
 
-from .identity import Identity
+from .identity import Identity, RecoveryKey
 
 
 DEFAULT_REGISTRY = "https://www.slashvibe.dev"
@@ -42,12 +42,15 @@ class Client:
         registry: str = DEFAULT_REGISTRY,
         sign_requests: bool = False,  # Safe Mode: signing optional
         working_on: str = "Building something",
+        with_recovery_key: bool = False,  # AIRC v0.2: Generate recovery key
     ):
         self.name = name
         self.registry = registry.rstrip("/")
         self.sign_requests = sign_requests
         self.working_on = working_on
+        self.with_recovery_key = with_recovery_key
         self.identity = Identity(name)
+        self.recovery_key: Optional[RecoveryKey] = None
         self._registered = False
         self._token = None
         self._session_id = None
@@ -56,17 +59,29 @@ class Client:
         """
         Register with the registry and get a session token.
 
-        POST /presence with action='register'
+        POST /api/users with action='register'
         """
         self.identity.ensure_keypair()
+
+        # Generate recovery key if requested (AIRC v0.2)
+        if self.with_recovery_key:
+            self.recovery_key = RecoveryKey(self.name).ensure_recovery_key()
 
         payload = {
             "action": "register",
             "username": self.name,
-            "workingOn": self.working_on,
+            "building": self.working_on,  # Changed from workingOn for /api/users
         }
 
-        result = self._post("/api/presence", payload, auth=False)
+        # Include public key
+        payload["publicKey"] = f"ed25519:{self.identity.public_key_base64}"
+
+        # Include recovery key if available (AIRC v0.2)
+        if self.recovery_key:
+            payload["recoveryKey"] = f"ed25519:{self.recovery_key.public_key_base64}"
+
+        # Use /api/users endpoint (supports recovery keys)
+        result = self._post("/api/users", payload, auth=False)
 
         if result.get("success") and result.get("token"):
             self._token = result["token"]
@@ -136,6 +151,101 @@ class Client:
         """
         result = self._get(f"{self.registry}/api/presence")
         return result.get("users", [])
+
+    # ============ AIRC v0.2: Key Rotation & Revocation ============
+
+    def rotate_key(self, new_public_key: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Rotate signing key using recovery key proof (AIRC v0.2).
+
+        Args:
+            new_public_key: New public key (ed25519:...). Auto-generated if not provided.
+
+        Returns:
+            Rotation response with new token
+
+        Raises:
+            ValueError: If no recovery key available
+        """
+        # Load recovery key if not already loaded
+        if not self.recovery_key:
+            self.recovery_key = RecoveryKey(self.name)
+            self.recovery_key.ensure_recovery_key()
+
+        # Generate new keypair if not provided
+        if not new_public_key:
+            self.identity._generate_keypair()
+            new_public_key = f"ed25519:{self.identity.public_key_base64}"
+
+        # Generate rotation proof
+        proof = self.recovery_key.generate_rotation_proof(new_public_key)
+
+        # Send rotation request
+        result = self._post(
+            f"/api/identity/{self.name}/rotate",
+            {
+                "new_public_key": new_public_key,
+                "proof": proof
+            },
+            auth=False
+        )
+
+        # Update token if rotation succeeded
+        if result.get("success") and result.get("token"):
+            self._token = result["token"]
+
+        return result
+
+    def revoke_identity(self, reason: str) -> Dict[str, Any]:
+        """
+        Permanently revoke identity (AIRC v0.2).
+
+        WARNING: This action cannot be undone.
+
+        Args:
+            reason: Revocation reason
+
+        Returns:
+            Revocation response
+
+        Raises:
+            ValueError: If no recovery key available
+        """
+        # Load recovery key if not already loaded
+        if not self.recovery_key:
+            self.recovery_key = RecoveryKey(self.name)
+            self.recovery_key.ensure_recovery_key()
+
+        # Generate revocation proof
+        proof = self.recovery_key.generate_revocation_proof(self.name, reason)
+
+        # Send revocation request
+        result = self._post("/api/identity/revoke", proof, auth=False)
+
+        # Clear local state
+        if result.get("success"):
+            self._token = None
+            self._registered = False
+
+        return result
+
+    def get_recovery_key(self) -> Optional[RecoveryKey]:
+        """
+        Get recovery key (AIRC v0.2).
+
+        Returns:
+            Recovery key or None if not available
+        """
+        if self.recovery_key:
+            return self.recovery_key
+
+        # Try loading from disk
+        try:
+            recovery = RecoveryKey(self.name)
+            recovery.ensure_recovery_key()
+            return recovery
+        except Exception:
+            return None
 
     def _post(self, endpoint: str, payload: dict, auth: bool = True) -> Dict[str, Any]:
         """Make a POST request, optionally with auth."""

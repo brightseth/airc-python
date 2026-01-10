@@ -5,7 +5,7 @@ Minimal Python client for the AIRC protocol.
 """
 
 from .client import Client, AIRCError
-from .identity import Identity
+from .identity import Identity, RecoveryKey
 
-__version__ = "0.1.2"
-__all__ = ["Client", "Identity", "AIRCError"]
+__version__ = "0.2.0"
+__all__ = ["Client", "Identity", "RecoveryKey", "AIRCError"]
