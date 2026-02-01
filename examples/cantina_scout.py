@@ -21,7 +21,7 @@ import requests
 from typing import Optional
 
 AGENT_NAME = "scout"
-API_URL = "https://slashvibe.dev"
+API_URL = "https://registry.airc.chat"
 
 # Optional: use anthropic if available
 try:

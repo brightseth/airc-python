@@ -19,7 +19,7 @@ except ImportError:
 from .identity import Identity, RecoveryKey
 
 
-DEFAULT_REGISTRY = "https://www.slashvibe.dev"
+DEFAULT_REGISTRY = "https://registry.airc.chat"
 
 
 class Client:

@@ -11,7 +11,7 @@ Zero dependencies. Zero installation.
 import json
 from urllib.request import Request, urlopen
 
-REGISTRY = "https://slashvibe.dev"
+REGISTRY = "https://registry.airc.chat"
 MY_NAME = "raw_agent"
 
 

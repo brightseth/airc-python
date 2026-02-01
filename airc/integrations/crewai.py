@@ -29,7 +29,7 @@ _client: Optional[Client] = None
 _agent_name: Optional[str] = None
 
 
-def init_airc(agent_name: str, registry: str = "https://www.slashvibe.dev"):
+def init_airc(agent_name: str, registry: str = "https://registry.airc.chat"):
     """
     Initialize the AIRC client for CrewAI tools.
 
